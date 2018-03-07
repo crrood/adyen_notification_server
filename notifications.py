@@ -6,11 +6,13 @@ import sqlalchemy, psycopg2
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, String, Boolean, Float, Integer
+
 engine = sqlalchemy.create_engine("postgresql+psycopg2://postgres:tgpli8sc2f@localhost:5432/postgres")
 Base = declarative_base()
 
 # Flask
 from flask import Flask, request
+
 app = Flask(__name__)
 
 # create DB Declaratives
@@ -31,8 +33,8 @@ class Notification(Base):
     originalReference = Column(String)
 
     def __repr__(self):
-        return "<Notification(raw_data={}, merchant_account={}, psp_reference={}>".format(
-                self.rawData, self.merchantAccountCode, self.pspReference)
+        attributes = [field for field in dir(self) if field[0] != "_"]
+        return str(["{}: {}".format(field, getattr(self, field)) for field in attributes])
 
 # save notifications to DB
 def save_to_db(json_data):
