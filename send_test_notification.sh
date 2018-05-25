@@ -1,3 +1,3 @@
 #!/bin/bash
 
-http post localhost:80/server/notifications/save < test_notification.json
+http post localhost:80/notification_server/notifications/ < test_notification.json

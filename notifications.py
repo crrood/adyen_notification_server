@@ -34,7 +34,7 @@ def save_to_db(json_data):
         notification = Notification(
             rawData=item,
             timestamp=time.time()
-        ))
+        )
 
         # iterate through object and populate row data
         for column in Notification.__table__.columns:
@@ -48,6 +48,10 @@ def save_to_db(json_data):
     session.commit()
     
     return notification.__repr__()
+
+# pull all notifications from DB
+def pull_all_notifications():
+    return "a fuckload of notifications"
 
 # post notification to Mattermost channel
 def send_to_mattermost(json_data):
@@ -77,12 +81,27 @@ def send_to_mattermost(json_data):
 
     return "sent to mattermost successfully"
 
+# respond to GET requests to confirm that the server is up
+@app.route("/notification_server/notifications/", methods=["GET"])
+def return_all_notifications():
+    return app.response_class(["Hi there!"], 200)
+
 # route notifications to DB
-@app.route("/server/notifications/save", methods=["POST"])
+@app.route("/notification_server/notifications/", methods=["POST"])
 def route_to_db():
 
     # get JSON object from request data
     json_data = request.get_json(force=True)
 
+    # save to DB
+    save_to_db(json_data)
+
     # send to DB
-    return app.response_class([save_to_db(json_data)], 200)
+    return app.response_class(["[accepted]"], 200)
+
+# display table HTML page
+@app.route("/notification_server/view_table/", methods=["GET"])
+def display_notification_table():
+    with open("table.html", "r") as html_file:
+        file_contents = html_file.read()
+    return app.response_class([file_contents], 200)
