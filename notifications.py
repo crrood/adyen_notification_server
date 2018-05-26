@@ -3,23 +3,22 @@ import json, time
 from urllib.request import Request, urlopen
 
 # DB connection
-import sqlalchemy
-from sqlalchemy.orm import sessionmaker
-from schema.notifications import Notification
+# import sqlalchemy
+# from sqlalchemy.orm import sessionmaker
+# from schema.notifications import Notification
 
 # Flask
-from flask import Flask, request
+from flask import Flask, Response, request, send_from_directory
 
 # initialize routing
 app = Flask(__name__)
 
 # initialize DB connection
-engine = sqlalchemy.create_engine("postgresql+psycopg2://postgres:tgpli8sc2f@localhost:5432/postgres")
-Session = sessionmaker(bind=engine)
+# engine = sqlalchemy.create_engine("postgresql+psycopg2://postgres:tgpli8sc2f@localhost:5432/postgres")
+# Session = sessionmaker(bind=engine)
 
 # save notifications to DB
 def save_to_db(json_data):
-    
     # pull list of notifications from JSON
     items = json_data["notificationItems"]
 
@@ -53,50 +52,60 @@ def save_to_db(json_data):
 def pull_all_notifications():
     return "a fuckload of notifications"
 
-# post notification to Mattermost channel
-def send_to_mattermost(json_data):
-
-    # set values to be re-used
-    MATTERMOST_URL = "https://mattermost.is.adyen.com/hooks/uz747icn5ig13bx8o5kw9ik5ya"
-    headers = { "Content-type": "application/json" }
-
+# save to a file to be read by the rss page
+def save_to_rss_file(json_data):
      # pull list of notifications from JSON
     items = json_data["notificationItems"]
 
-    # parse notifications for forwarding
+    # parse notifications
     for item in items:
         item = item["NotificationRequestItem"]
 
+        # save notification to file for merchant account
+        merchant_account = item["merchantAccountCode"]
+        with open("notification_files/{}".format(merchant_account), "w") as file:
+            file.write("data: {}".format(item))
+            file.write("\n\n")
 
-        # build request object
-        mattermost_data = {
-            "username": item["merchantAccountCode"],
-            "text": json.dumps(item)
-        }
-
-        # send request
-        #request = Request(MATTERMOST_URL, json.dumps(mattermost_data).encode("UTF8"), headers)
-        request = Request(MATTERMOST_URL, '{"text": "Testing..."}'.encode("UTF8"), headers)
-        urlopen(request)
-
-    return "sent to mattermost successfully"
+# serve static files
+@app.route('/static_files/<path:path>')
+def serve_files(path):
+    return send_from_directory("static_files", path)
 
 # respond to GET requests to confirm that the server is up
 @app.route("/notification_server/notifications/", methods=["GET"])
 def return_all_notifications():
     return app.response_class(["Hi there!"], 200)
 
-# route notifications to DB
-@app.route("/notification_server/notifications/", methods=["POST"])
-def route_to_db():
+# respond with event-stream encoded notification
+# for a given merchant account
+@app.route("/notification_server/notifications/<merchant_account>", methods=["GET"])
+def return_latest_for_merchant(merchant_account):
+    # load event to send from file
+    with open("notification_files/{}".format(merchant_account), "r") as file:
+        file_contents = file.read()
 
+    # build response
+    resp = Response(response=file_contents, mimetype="text/event-stream")
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Cache-Control"] = "no-cache"
+
+    # send response
+    return resp
+
+# route notifications to DB
+@app.route("/notification_server/notifications", methods=["POST"])
+def incoming_notification():
     # get JSON object from request data
     json_data = request.get_json(force=True)
 
     # save to DB
-    save_to_db(json_data)
+    # save_to_db(json_data)
 
-    # send to DB
+    # save to file to be read by rss feed
+    save_to_rss_file(json_data)
+
+    # send accepted response
     return app.response_class(["[accepted]"], 200)
 
 # display table HTML page
