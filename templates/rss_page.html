@@ -16,7 +16,7 @@
 
 <script>
 
-var eventSource = new EventSource("/notification_server/notifications/ColinRood");
+var eventSource = new EventSource("/notification_server/notifications/{{ merchant_account }}");
 var lastTimestamp = 0;
 
 eventSource.onmessage = function(e) {

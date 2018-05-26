@@ -9,9 +9,14 @@ from urllib.request import Request, urlopen
 
 # Flask
 from flask import Flask, Response, request, send_from_directory
-
-# initialize routing
 app = Flask(__name__)
+
+# Jinja
+from jinja2 import Environment, PackageLoader, select_autoescape
+env = Environment(
+    loader=PackageLoader("notifications", "templates"),
+    autoescape=select_autoescape(["html", "xml"])
+)
 
 # initialize DB connection
 # engine = sqlalchemy.create_engine("postgresql+psycopg2://postgres:tgpli8sc2f@localhost:5432/postgres")
@@ -72,6 +77,13 @@ def save_to_rss_file(json_data):
 def serve_files(path):
     return send_from_directory("static_files", path)
 
+# show rss feed for merchant account
+@app.route("/notification_server/notifications/view/<merchant_account>", methods=["GET"])
+def render_rss_feed(merchant_account):
+    # render jinja template with merchant account inserted
+    template = env.get_template("rss_page.html")
+    return template.render(merchant_account=merchant_account)
+
 # respond to GET requests to confirm that the server is up
 @app.route("/notification_server/notifications/", methods=["GET"])
 def return_all_notifications():
@@ -81,6 +93,7 @@ def return_all_notifications():
 # for a given merchant account
 @app.route("/notification_server/notifications/<merchant_account>", methods=["GET"])
 def return_latest_for_merchant(merchant_account):
+
     # load event to send from file
     with open("notification_files/{}".format(merchant_account), "r") as file:
         file_contents = file.read()
