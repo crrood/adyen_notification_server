@@ -5,6 +5,8 @@ from urllib.request import Request, urlopen
 # DB connection
 import sqlalchemy
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import select
+from sqlalchemy import desc
 from schema.notifications import Notification
 
 # Flask
@@ -52,8 +54,20 @@ def save_to_db(json_data):
     
     return notification.__repr__()
 
-# pull all notifications from DB
-def pull_all_notifications():
+# get rawData for last n notifications for given merchantAccount from DB
+# returns an array
+def get_latest_n_from_db(merchant_account, number_of_notifications):
+    session = Session()
+    result = []
+    for id, raw_data in session.query(Notification.id, Notification.rawData).\
+            filter_by(merchantAccountCode=merchant_account).\
+            order_by(desc(Notification.id))[1:number_of_notifications]:
+        result.append(raw_data)
+
+    return result
+
+# get all notifications from DB
+def get_all_notifications():
     return "a fuckload of notifications"
 
 # save to a file to be read by the rss page
@@ -88,10 +102,11 @@ def render_rss_feed(merchant_account):
 def return_all_notifications():
     return app.response_class(["Hi there!"], 200)
 
-# respond with event-stream encoded notification for a given merchant account
+# respond with most recent notification for a given merchant account
 # reads from a file rather than the DB
+# event-stream encoded for digestion by server-sent event listener
 @app.route("/notification_server/notifications/<merchant_account>", methods=["GET"])
-def return_latest_for_merchant(merchant_account):
+def return_latest(merchant_account):
     
     # load event to send from file
     try:
@@ -108,7 +123,14 @@ def return_latest_for_merchant(merchant_account):
     except FileNotFoundError:
         return ""
 
-# route notifications to DB
+# respond with most recent n notifications for a given merchant account
+# returns array of json objects pulled from DB
+@app.route("/notification_server/notifications/<string:merchant_account>/<int:number_of_notifications>", methods=["GET"])
+def return_latest_n_for_merchant(merchant_account, number_of_notifications):
+    result = get_latest_n_from_db(merchant_account, number_of_notifications)
+    return Response("{}".format(result))
+
+# handle incoming notifications
 @app.route("/notification_server/notifications/", methods=["POST"])
 def incoming_notification():
     # get JSON object from request data
