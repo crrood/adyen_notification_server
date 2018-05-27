@@ -54,14 +54,15 @@ def save_to_db(json_data):
     
     return notification.__repr__()
 
-# get rawData for last n notifications for given merchantAccount from DB
+# get rawData for range of notifications for given merchantAccount from DB
+# the most recent notification isn't included, as it's stored in the file system
 # returns an array
-def get_latest_n_from_db(merchant_account, number_of_notifications):
+def get_range_from_db(merchant_account, first_notification, last_notification):
     session = Session()
     result = []
     for id, raw_data in session.query(Notification.id, Notification.rawData).\
             filter_by(merchantAccountCode=merchant_account).\
-            order_by(desc(Notification.id))[1:number_of_notifications + 1]:
+            order_by(desc(Notification.id))[first_notification : last_notification]:
         result.append(raw_data)
 
     return result
@@ -125,9 +126,9 @@ def return_latest(merchant_account):
 
 # respond with most recent n notifications for a given merchant account
 # returns array of json objects pulled from DB
-@app.route("/notification_server/notifications/<string:merchant_account>/<int:number_of_notifications>", methods=["GET"])
-def return_latest_n_for_merchant(merchant_account, number_of_notifications):
-    result = get_latest_n_from_db(merchant_account, number_of_notifications)
+@app.route("/notification_server/notifications/<string:merchant_account>/<int:first_notification_id>/<int:last_notification_id>", methods=["GET"])
+def return_range_for_merchant(merchant_account, first_notification_id, last_notification_id):
+    result = get_range_from_db(merchant_account, first_notification_id, last_notification_id)
     return Response("{}".format(result))
 
 # handle incoming notifications

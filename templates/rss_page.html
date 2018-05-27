@@ -19,6 +19,7 @@
 
 var eventSource = new EventSource("/notification_server/notifications/{{ merchant_account }}");
 var lastTimestamp = 0;
+var currentNotificationId = 0;
 
 // add a notification to the DOM and activate code highlighting
 // if first = true adds to top
@@ -80,8 +81,11 @@ document.querySelector("#loadMoreBtn").addEventListener("click", () => {
 			}
 		}
 	}
-	req.open("GET", "/notification_server/notifications/{{ merchant_account }}/10", true);
+	url = "/notification_server/notifications/{{ merchant_account }}/" + (currentNotificationId + 1).toString() + "/" + (currentNotificationId + 11).toString()
+	req.open("GET", url, true);
 	req.send();
+
+	currentNotificationId += 10;
 });
 
 </script>
