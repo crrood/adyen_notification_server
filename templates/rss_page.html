@@ -11,6 +11,7 @@
 	<h1>Notification feed</h1>
 	<hr>
 	<div id="list"></div>
+	<button id="loadMoreBtn">Load more</button>
 </body>
 </html>
 
@@ -19,6 +20,38 @@
 var eventSource = new EventSource("/notification_server/notifications/{{ merchant_account }}");
 var lastTimestamp = 0;
 
+// add a notification to the DOM and activate code highlighting
+// if first = true adds to top
+function addToDom(notification, first) {
+
+	// create element to be added
+	var notificationContainer = document.createElement("pre");
+	var notificationElement = document.createElement("code");
+	notificationContainer.appendChild(notificationElement);
+
+	// set up new element
+	if (first) {
+		if (document.querySelector(".first") != null) {
+			document.querySelector(".first").classList.remove("first");
+		}
+		notificationElement.classList.add("first");
+	}
+	notificationElement.classList.add("json");
+	notificationElement.innerHTML = JSON.stringify(notification, null, 4);
+
+	// add to DOM
+	eventList = document.getElementById("list");
+	if (first) {
+		eventList.insertBefore(notificationContainer, eventList.firstChild);
+	} else {
+		eventList.appendChild(notificationContainer);
+	}
+
+	// activate highlighting
+	hljs.highlightBlock(notificationElement);
+}
+
+// callback from server-send event
 eventSource.onmessage = function(e) {
 
 	// get data from event and json encode
@@ -27,30 +60,29 @@ eventSource.onmessage = function(e) {
 	// if the event sent by the server is newer, add it to the page
 	if (Date.parse(notification.eventDate) > lastTimestamp) {
 
-		// create element to be added
-		var notificationContainer = document.createElement("pre");
-		var notificationElement = document.createElement("code");
-		notificationContainer.appendChild(notificationElement);
-
-		// set up new element
-		if (document.querySelector(".first") != null) {
-			document.querySelector(".first").classList.remove("first");
-		}
-		notificationElement.classList.add("json");
-		notificationElement.classList.add("first");
-		notificationElement.innerHTML = JSON.stringify(notification, null, 4);
-
 		// add to DOM
-		eventList = document.getElementById("list")
-		eventList.insertBefore(notificationContainer, eventList.firstChild);
-
-		// activate highlighting
-		hljs.highlightBlock(notificationElement);
+		addToDom(notification, true);
 
 		// update current timestamp
 		lastTimestamp = Date.parse(notification.eventDate);
 	}
 }
+
+document.querySelector("#loadMoreBtn").addEventListener("click", () => {
+	console.log("loading more notifications");
+	var req = new XMLHttpRequest();
+	req.onreadystatechange = function(){
+		if (this.readyState == 4) {
+			notifications = JSON.parse(this.responseText.replace(/'/g, '"'));
+			console.log(notifications);
+			for (var i = 0; i < notifications.length; i++) {
+				addToDom(notifications[i], false);
+			}
+		}
+	}
+	req.open("GET", "/notification_server/notifications/{{ merchant_account }}/10", true);
+	req.send();
+});
 
 </script>
 
@@ -67,6 +99,17 @@ h1 {
 
 code.first {
 	background: #383838;
+}
+
+button {
+	background: #484848;
+	color: #FFF;
+	border: 0px;
+	border-radius: 6px;
+	padding: 15px 45px 15px 45px;
+	font-size: 24px;
+	font-weight: bold;
+	outline: none;
 }
 
 </style>
