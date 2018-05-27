@@ -3,24 +3,23 @@ import json, time
 from urllib.request import Request, urlopen
 
 # DB connection
-# import sqlalchemy
-# from sqlalchemy.orm import sessionmaker
-# from schema.notifications import Notification
+import sqlalchemy
+from sqlalchemy.orm import sessionmaker
+from schema.notifications import Notification
 
 # Flask
 from flask import Flask, Response, request, send_from_directory
 app = Flask(__name__)
 
 # Jinja
-from jinja2 import Environment, PackageLoader, select_autoescape
+from jinja2 import Environment, PackageLoader
 env = Environment(
-    loader=PackageLoader("notifications", "templates"),
-    autoescape=select_autoescape(["html", "xml"])
+    loader=PackageLoader("notifications", "templates")
 )
 
 # initialize DB connection
-# engine = sqlalchemy.create_engine("postgresql+psycopg2://postgres:tgpli8sc2f@localhost:5432/postgres")
-# Session = sessionmaker(bind=engine)
+engine = sqlalchemy.create_engine("postgresql+psycopg2://postgres:tgpli8sc2f@localhost:5432/postgres")
+Session = sessionmaker(bind=engine)
 
 # save notifications to DB
 def save_to_db(json_data):
@@ -85,45 +84,41 @@ def render_rss_feed(merchant_account):
     return template.render(merchant_account=merchant_account)
 
 # respond to GET requests to confirm that the server is up
-@app.route("/notification_server/notifications/", methods=["GET"])
+@app.route("/notification_server/", methods=["GET"])
 def return_all_notifications():
     return app.response_class(["Hi there!"], 200)
 
-# respond with event-stream encoded notification
-# for a given merchant account
+# respond with event-stream encoded notification for a given merchant account
+# reads from a file rather than the DB
 @app.route("/notification_server/notifications/<merchant_account>", methods=["GET"])
 def return_latest_for_merchant(merchant_account):
-
+    
     # load event to send from file
-    with open("notification_files/{}".format(merchant_account), "r") as file:
-        file_contents = file.read()
+    try:
+        with open("notification_files/{}".format(merchant_account), "r") as file:
+            file_contents = file.read()
 
-    # build response
-    resp = Response(response=file_contents, mimetype="text/event-stream")
-    resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Cache-Control"] = "no-cache"
+       # build response
+        resp = Response(response=file_contents, mimetype="text/event-stream")
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Cache-Control"] = "no-cache"
 
-    # send response
-    return resp
+        return resp
+
+    except FileNotFoundError:
+        return ""
 
 # route notifications to DB
-@app.route("/notification_server/notifications", methods=["POST"])
+@app.route("/notification_server/notifications/", methods=["POST"])
 def incoming_notification():
     # get JSON object from request data
     json_data = request.get_json(force=True)
 
     # save to DB
-    # save_to_db(json_data)
+    save_to_db(json_data)
 
     # save to file to be read by rss feed
     save_to_rss_file(json_data)
 
     # send accepted response
     return app.response_class(["[accepted]"], 200)
-
-# display table HTML page
-@app.route("/notification_server/view_table/", methods=["GET"])
-def display_notification_table():
-    with open("table.html", "r") as html_file:
-        file_contents = html_file.read()
-    return app.response_class([file_contents], 200)
