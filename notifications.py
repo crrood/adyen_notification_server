@@ -61,7 +61,7 @@ def get_latest_n_from_db(merchant_account, number_of_notifications):
     result = []
     for id, raw_data in session.query(Notification.id, Notification.rawData).\
             filter_by(merchantAccountCode=merchant_account).\
-            order_by(desc(Notification.id))[1:number_of_notifications]:
+            order_by(desc(Notification.id))[1:number_of_notifications + 1]:
         result.append(raw_data)
 
     return result
