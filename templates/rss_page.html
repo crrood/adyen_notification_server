@@ -20,6 +20,7 @@
 var eventSource = new EventSource("/notification_server/notifications/{{ merchant_account }}");
 var lastTimestamp = 0;
 var currentNotificationId = 0;
+var notificationsPerRequest = 10
 
 // add a notification to the DOM and activate code highlighting
 // if first = true adds to top
@@ -69,23 +70,40 @@ eventSource.onmessage = function(e) {
 	}
 }
 
+// query server for more notifications
 document.querySelector("#loadMoreBtn").addEventListener("click", () => {
-	console.log("loading more notifications");
+
+	// calculate range to ask for
+	firstNotification = currentNotificationId + 1;
+	lastNotification = currentNotificationId + 1 + notificationsPerRequest;
+	url = "/notification_server/notifications/{{ merchant_account }}/" + firstNotification.toString() + "/" + lastNotification.toString();
+	currentNotificationId += notificationsPerRequest;
+
+	// add returned notifications to DOM
 	var req = new XMLHttpRequest();
 	req.onreadystatechange = function(){
 		if (this.readyState == 4) {
-			notifications = JSON.parse(this.responseText.replace(/'/g, '"'));
+
+			// parse response
 			console.log(notifications);
+			notifications = JSON.parse(this.responseText.replace(/'/g, '"'));
+
+			// create DOM element for each JSON object in response
 			for (var i = 0; i < notifications.length; i++) {
 				addToDom(notifications[i], false);
 			}
+
+			// hide the button if there are no more notifications available
+			if (notifications.length < notificationsPerRequest) {
+				document.querySelector("#loadMoreBtn").style.display = "none";
+			}
 		}
 	}
-	url = "/notification_server/notifications/{{ merchant_account }}/" + (currentNotificationId + 1).toString() + "/" + (currentNotificationId + 11).toString()
+
+	// send request
 	req.open("GET", url, true);
 	req.send();
 
-	currentNotificationId += 10;
 });
 
 </script>

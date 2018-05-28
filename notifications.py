@@ -20,7 +20,11 @@ env = Environment(
 )
 
 # initialize DB connection
-engine = sqlalchemy.create_engine("postgresql+psycopg2://postgres:tgpli8sc2f@localhost:5432/postgres")
+# username / password are in credentials.txt on line 1 and 2
+with open("credentials.txt", "r") as credentials_file:
+    username = credentials_file.readline().strip()
+    password = credentials_file.readline().strip()
+engine = sqlalchemy.create_engine("postgresql+psycopg2://{}:{}@localhost:5432/postgres".format(username, password))
 Session = sessionmaker(bind=engine)
 
 # save notifications to DB
@@ -59,13 +63,19 @@ def save_to_db(json_data):
 # returns an array
 def get_range_from_db(merchant_account, first_notification, last_notification):
     session = Session()
-    result = []
-    for id, raw_data in session.query(Notification.id, Notification.rawData).\
-            filter_by(merchantAccountCode=merchant_account).\
-            order_by(desc(Notification.id))[first_notification : last_notification]:
-        result.append(raw_data)
+    response = []
 
-    return result
+    # query DB
+    results = session.query(Notification.id, Notification.rawData).\
+        filter_by(merchantAccountCode=merchant_account).\
+        order_by(desc(Notification.id))
+
+    # put results into array
+    last_notification = min(results.count() - 1, last_notification)
+    for id, raw_data in results[first_notification : last_notification]:
+        response.append(raw_data)
+
+    return response
 
 # get all notifications from DB
 def get_all_notifications():
