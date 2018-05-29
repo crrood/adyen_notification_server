@@ -85,7 +85,6 @@ document.querySelector("#loadMoreBtn").addEventListener("click", () => {
 		if (this.readyState == 4) {
 
 			// parse response
-			console.log(notifications);
 			notifications = JSON.parse(this.responseText.replace(/'/g, '"'));
 
 			// create DOM element for each JSON object in response
