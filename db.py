@@ -6,7 +6,10 @@ from sqlalchemy.orm import sessionmaker
 from schema.notifications import Notification
 
 # initialize engine
-engine = sqlalchemy.create_engine("postgresql+psycopg2://postgres:tgpli8sc2f@localhost:5432/postgres")
+with open("credentials.txt", "r") as credentials_file:
+    username = credentials_file.readline().strip()
+    password = credentials_file.readline().strip()
+engine = sqlalchemy.create_engine("postgresql+psycopg2://{}:{}@localhost:5432/postgres".format(username, password))
 Session = sessionmaker(bind=engine)
 
 if sys.argv[1] == "reset":
@@ -37,14 +40,33 @@ elif sys.argv[1] == "migrate":
                     setattr(notification, column.name, row[column.name])
 
             # imperfect mappings
-            json_data = json.loads(row["data"])["notificationItems"][0]["NotificationRequestItem"]
-            notification.rawData = json_data
-            notification.merchantAccountCode = json_data["merchantAccountCode"]
-            notification.eventCode = json_data["eventCode"]
-            notification.success = json_data["success"].lower() == "true"
+            notification.timestamp = float(notification.timestamp)
+            notification.success = notification.success.lower() == "true"
 
             # insert notification into list to be added to DB
             session.add(notification)
 
         # commit to DB
         session.commit()
+
+elif sys.argv[1] == "dump":
+    
+    # create a session
+    session = Session()
+    
+    # load all notifications
+    notifications = session.query(Notification)
+
+    # dump to csv file
+    with open("db_dump.csv", "w") as output_file:
+
+        # write headers
+        for column in Notification.__table__.columns:
+            output_file.write("{},".format(column.name))
+        output_file.write("\n")
+
+        # write contents of Notification table
+        for notification in session.query(Notification):
+            for column in Notification.__table__.columns:
+                output_file.write('"{}",'.format(str(getattr(notification, column.name).replace("'", ""))))
+            output_file.write("\n")
