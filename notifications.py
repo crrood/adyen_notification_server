@@ -7,6 +7,8 @@ import sqlalchemy
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import select
 from sqlalchemy import desc
+
+# Schema
 from schema.notifications import Notification
 
 # Flask
@@ -24,10 +26,39 @@ env = Environment(
 with open("credentials.txt", "r") as credentials_file:
     username = credentials_file.readline().strip()
     password = credentials_file.readline().strip()
-engine = sqlalchemy.create_engine("postgresql+psycopg2://{}:{}@localhost:5432/postgres".format(username, password))
+db_url = "postgresql+psycopg2://{}:{}@localhost:5432/postgres".format(username, password)
+engine = sqlalchemy.create_engine(db_url)
 Session = sessionmaker(bind=engine)
 
-# save notifications to DB
+# Migrations
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+
+# create DB Declaratives
+class Notification(db.Model):
+    __tablename__ = "notifications"
+
+    id = db.Column(db.Integer, primary_key=True)
+    rawData = db.Column(db.String(1000))
+    merchantAccountCode = db.Column(db.String(75))
+    pspReference = db.Column(db.String(100))
+    merchantReference = db.Column(db.String(100))
+    timestamp = db.Column(db.Float)
+    eventDate = db.Column(db.String(25))
+    eventCode = db.Column(db.String(25))
+    success = db.Column(db.Boolean)
+    reason = db.Column(db.String(300))
+    paymentMethod = db.Column(db.String(100))
+    originalReference = db.Column(db.String(100))
+
+    def __repr__(self):
+        attributes = [field for field in dir(self) if field[0] != "_"]
+        return str(["{}: {}".format(field, getattr(self, field)) for field in attributes])
+
+## save notifications to DB
 def save_to_db(json_data):
     # pull list of notifications from JSON
     items = json_data["notificationItems"]
