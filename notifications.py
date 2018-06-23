@@ -1,5 +1,5 @@
 # utilities
-import json, time
+import json, time, re
 from urllib.request import Request, urlopen
 
 # DB connection
@@ -7,9 +7,6 @@ import sqlalchemy
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import select
 from sqlalchemy import desc
-
-# Schema
-from schema.notifications import Notification
 
 # Flask
 from flask import Flask, Response, request, send_from_directory
@@ -42,7 +39,7 @@ class Notification(db.Model):
     __tablename__ = "notifications"
 
     id = db.Column(db.Integer, primary_key=True)
-    rawData = db.Column(db.String(1000))
+    rawData = db.Column(db.String(5000))
     merchantAccountCode = db.Column(db.String(75))
     pspReference = db.Column(db.String(100))
     merchantReference = db.Column(db.String(100))
@@ -58,7 +55,13 @@ class Notification(db.Model):
         attributes = [field for field in dir(self) if field[0] != "_"]
         return str(["{}: {}".format(field, getattr(self, field)) for field in attributes])
 
-## save notifications to DB
+# remove apostrophes from raw data
+def sanitize_response(raw_data):
+    raw_data = re.sub(r"([a-zA-Z])'([a-zA-Z])", "\g<1>\g<2>", raw_data)
+    raw_data = raw_data.replace('"', "'")
+    return raw_data
+
+# save notifications to DB
 def save_to_db(json_data):
     # pull list of notifications from JSON
     items = json_data["notificationItems"]
@@ -72,7 +75,7 @@ def save_to_db(json_data):
 
         # create new notification object to insert into DB
         notification = Notification(
-            rawData=item,
+            rawData=str(item),
             timestamp=time.time()
         )
 
@@ -104,6 +107,9 @@ def get_range_from_db(merchant_account, first_notification, last_notification):
     # put results into array
     last_notification = min(results.count() - 1, last_notification)
     for id, raw_data in results[first_notification : last_notification]:
+
+        # get rid of apostrophes within fields
+        raw_data = sanitize_response(raw_data)
         response.append(raw_data)
 
     return response
@@ -155,8 +161,9 @@ def return_latest(merchant_account):
         with open("notification_files/{}".format(merchant_account), "r") as file:
             file_contents = file.read()
 
-       # build response
-        resp = Response(response=file_contents, mimetype="text/event-stream")
+        # build response
+        formatted_data = sanitize_response(file_contents)
+        resp = Response(response=formatted_data, mimetype="text/event-stream")
         resp.headers["Access-Control-Allow-Origin"] = "*"
         resp.headers["Cache-Control"] = "no-cache"
 

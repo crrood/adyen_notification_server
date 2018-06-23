@@ -22,6 +22,13 @@ var lastTimestamp = 0;
 var currentNotificationId = 0;
 var notificationsPerRequest = 10
 
+// fix stray apostrophes in JSON data
+// and return formatted JSON object
+function sanitizeJSON(rawText) {
+	formattedText = rawText.replace(/"/g, "").replace(/'/g, '"');
+	return JSON.parse(formattedText);
+}
+
 // add a notification to the DOM and activate code highlighting
 // if first = true adds to top
 function addToDom(notification, first) {
@@ -57,7 +64,7 @@ function addToDom(notification, first) {
 eventSource.onmessage = function(e) {
 
 	// get data from event and json encode
-	notification = JSON.parse(e.data.replace(/'/g, '"'));
+	notification = sanitizeJSON(e.data);
 
 	// if the event sent by the server is newer, add it to the page
 	if (Date.parse(notification.eventDate) > lastTimestamp) {
@@ -85,7 +92,7 @@ document.querySelector("#loadMoreBtn").addEventListener("click", () => {
 		if (this.readyState == 4) {
 
 			// parse response
-			notifications = JSON.parse(this.responseText.replace(/'/g, '"'));
+			notifications = sanitizeJSON(this.responseText);
 
 			// create DOM element for each JSON object in response
 			for (var i = 0; i < notifications.length; i++) {
