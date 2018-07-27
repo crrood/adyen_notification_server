@@ -1,13 +1,11 @@
 <html>
 <head>
-	<!-- <link href="files/prism.css" rel="stylesheet" /> -->
 	<link rel="stylesheet"
 	      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/darcula.min.css">
 	<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
 </head>
 
 <body>
-	<!-- <script src="files/prism.js"></script> -->
 	<h1>Notification feed</h1>
 	<hr>
 	<div id="list"></div>
@@ -123,6 +121,7 @@ body {
 h1 {
 	color: #FFF;
 	font-family: sans-serif;
+	user-select: none;
 }
 
 code.first {
@@ -138,6 +137,8 @@ button {
 	font-size: 24px;
 	font-weight: bold;
 	outline: none;
+	cursor: pointer;
+	user-select: none;
 }
 
 ::selection {

@@ -10,7 +10,9 @@ from sqlalchemy import desc
 
 # Flask
 from flask import Flask, Response, request, send_from_directory
+from flask_cors import CORS
 app = Flask(__name__)
+CORS(app)
 
 # Jinja
 from jinja2 import Environment, PackageLoader
@@ -172,7 +174,8 @@ def return_latest(merchant_account):
     except FileNotFoundError:
         return ""
 
-# respond with most recent n notifications for a given merchant account
+# respond with notifications from n to m for a given merchant
+# with n=0 being the latest entry
 # returns array of json objects pulled from DB
 @app.route("/notification_server/notifications/<string:merchant_account>/<int:first_notification_id>/<int:last_notification_id>", methods=["GET"])
 def return_range_for_merchant(merchant_account, first_notification_id, last_notification_id):
