@@ -27,7 +27,7 @@ env = Environment(
 # otherwise defaults to production
 try:
     with open("env.txt") as env_file:
-        if env_file.read() == "DEV":
+        if env_file.read().strip() == "DEV":
             ENV = "_dev"
         else:
             ENV = ""
