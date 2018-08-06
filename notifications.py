@@ -22,8 +22,18 @@ env = Environment(
     loader=PackageLoader("notifications", "templates")
 )
 
-# constants
-ENV = "_dev" # blank for live
+# super janky "deployment" control
+# if env.txt exists and has "DEV" as its only contents, uses dev environment
+# otherwise defaults to production
+try:
+    with open("env.txt") as env_file:
+        if env_file.read() == "DEV":
+            ENV = "_dev"
+        else:
+            ENV = ""
+except FileNotFoundError:
+    ENV = ""
+
 SERVER_ROOT = "/notification_server{}".format(ENV)
 
 # initialize flask app
