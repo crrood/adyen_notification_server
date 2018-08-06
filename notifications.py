@@ -1,5 +1,5 @@
 # utilities
-import json, time, re
+import time, re
 from urllib.request import Request, urlopen
 
 # DB connection
@@ -11,14 +11,25 @@ from sqlalchemy import desc
 # Flask
 from flask import Flask, Response, request, send_from_directory
 from flask_cors import CORS
-app = Flask(__name__)
-CORS(app)
+from werkzeug.datastructures import Headers
+
+# socketIO
+from flask_socketio import SocketIO, emit
 
 # Jinja
 from jinja2 import Environment, PackageLoader
 env = Environment(
     loader=PackageLoader("notifications", "templates")
 )
+
+# constants
+ENV = "_dev" # blank for live
+SERVER_ROOT = "/notification_server{}".format(ENV)
+
+# initialize flask app
+app = Flask(__name__)
+CORS(app)
+socketio = SocketIO(app, path=f"{SERVER_ROOT}/socket.io")
 
 # initialize DB connection
 # username / password are in credentials.txt on line 1 and 2
@@ -84,7 +95,12 @@ def save_to_db(json_data):
         # iterate through object and populate row data
         for column in Notification.__table__.columns:
             if column.name in item.keys():
-                setattr(notification, column.name, item[column.name])
+                formatted_value = item[column.name]
+                if formatted_value.lower() == "false":
+                    formatted_value = False
+                elif formatted_value.lower() == "true":
+                    formatted_value = True
+                setattr(notification, column.name, formatted_value)
 
         # insert notification into list to be added to DB
         session.add(notification)
@@ -120,8 +136,9 @@ def get_range_from_db(merchant_account, first_notification, last_notification):
 def get_all_notifications():
     return "a fuckload of notifications"
 
-# save to a file to be read by the rss page
-def save_to_rss_file(json_data):
+# save to a file to be read by the feed page
+def save_to_file(json_data):
+
      # pull list of notifications from JSON
     items = json_data["notificationItems"]
 
@@ -132,58 +149,57 @@ def save_to_rss_file(json_data):
         # save notification to file for merchant account
         merchant_account = item["merchantAccountCode"]
         with open("notification_files/{}".format(merchant_account), "w") as file:
-            file.write("data: {}".format(item))
-            file.write("\n\n")
+            file.write(str(item))
+
+        # notify listeners
+        socketio.emit("notification_available", { "merchantAccount": merchant_account, "notificationData": str(item) }, broadcast=True)
 
 # serve static files
-@app.route('/static_files/<path:path>')
+@app.route(f'{SERVER_ROOT}/static_files/<path:path>')
 def serve_files(path):
     return send_from_directory("static_files", path)
 
-# show rss feed for merchant account
-@app.route("/notification_server/notifications/view/<merchant_account>", methods=["GET"])
-def render_rss_feed(merchant_account):
+# show HTML page for notification feed
+# generates a template based on merchant account in URL
+@app.route(f"{SERVER_ROOT}/notifications/view/<merchant_account>", methods=["GET"])
+def render_feed(merchant_account):
     # render jinja template with merchant account inserted
-    template = env.get_template("rss_page.html")
-    return template.render(merchant_account=merchant_account)
+    template = env.get_template("notification_feed.html")
+    return template.render(merchant_account=merchant_account, server_root=SERVER_ROOT)
 
 # respond to GET requests to confirm that the server is up
-@app.route("/notification_server/", methods=["GET"])
+@app.route(f"{SERVER_ROOT}/", methods=["GET"])
 def return_all_notifications():
     return app.response_class(["Hi there!"], 200)
 
+# load json from a file
+def get_notification_from_file(merchant_account):
+     with open("notification_files/{}".format(merchant_account), "r") as file:
+         return sanitize_response(file.read())
+
 # respond with most recent notification for a given merchant account
 # reads from a file rather than the DB
-# event-stream encoded for digestion by server-sent event listener
-@app.route("/notification_server/notifications/<merchant_account>", methods=["GET"])
-def return_latest(merchant_account):
-    
-    # load event to send from file
-    try:
-        with open("notification_files/{}".format(merchant_account), "r") as file:
-            file_contents = file.read()
-
-        # build response
-        formatted_data = sanitize_response(file_contents)
-        resp = Response(response=formatted_data, mimetype="text/event-stream")
-        resp.headers["Access-Control-Allow-Origin"] = "*"
-        resp.headers["Cache-Control"] = "no-cache"
-
-        return resp
-
-    except FileNotFoundError:
-        return ""
+@app.route(f"{SERVER_ROOT}/notifications/<merchant_account>", methods=["GET"])
+def return_latest_via_http(merchant_account):
+    return Response(get_notification_from_file(merchant_account),
+        mimetype="text/json",
+        headers=Headers([
+            ("Access-Control-Allow-Origin", "roodberry.duckdns.org,www.roodvibes.com"),
+            ("Cache-Control", "no-cache"),
+            ("Connection", "keep-alive")
+        ])
+    )
 
 # respond with notifications from n to m for a given merchant
 # with n=0 being the latest entry
 # returns array of json objects pulled from DB
-@app.route("/notification_server/notifications/<string:merchant_account>/<int:first_notification_id>/<int:last_notification_id>", methods=["GET"])
+@app.route(f"{SERVER_ROOT}/notifications/<string:merchant_account>/<int:first_notification_id>/<int:last_notification_id>", methods=["GET"])
 def return_range_for_merchant(merchant_account, first_notification_id, last_notification_id):
     result = get_range_from_db(merchant_account, first_notification_id, last_notification_id)
     return Response("{}".format(result))
 
 # handle incoming notifications
-@app.route("/notification_server/notifications/", methods=["POST"])
+@app.route(f"{SERVER_ROOT}/notifications/", methods=["POST"])
 def incoming_notification():
     # get JSON object from request data
     json_data = request.get_json(force=True)
@@ -191,8 +207,20 @@ def incoming_notification():
     # save to DB
     save_to_db(json_data)
 
-    # save to file to be read by rss feed
-    save_to_rss_file(json_data)
+    # save to file to be read by feed
+    save_to_file(json_data)
 
     # send accepted response
     return app.response_class(["[accepted]"], 200)
+
+@socketio.on("request_latest")
+def return_latest_via_socket(data):
+    emit("notification_avilable", { 
+        "merchantAccount": data["merchantAccount"], 
+        "notificationData": get_notification_from_file(data["merchantAccount"])
+    })
+    return get_notification_from_file(data["merchantAccount"])
+
+@socketio.on("ping")
+def pong(data):
+    return data

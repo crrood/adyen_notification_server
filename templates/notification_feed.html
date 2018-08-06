@@ -3,6 +3,8 @@
 	<link rel="stylesheet"
 	      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/darcula.min.css">
 	<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+	<script type="text/javascript" src="//code.jquery.com/jquery-1.4.2.min.js"></script>
+	<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.5/socket.io.min.js"></script>
 </head>
 
 <body>
@@ -15,17 +17,39 @@
 
 <script>
 
-var eventSource = new EventSource("/notification_server/notifications/{{ merchant_account }}");
-var lastTimestamp = 0;
+var lastEventId = 1;
 var currentNotificationId = 0;
 var notificationsPerRequest = 10
+
+// initialize socket connection
+var socket = io.connect("", {
+	path: "{{ server_root }}/socket.io", 
+	reconnection: false
+});
+
+// get initial notification from server on page load
+socket.on("connect", () => {
+	socket.emit("request_latest", 
+		{ merchantAccount: "{{ merchant_account }}" }, 
+		data => { 
+			receiveNotification(data);
+		}
+	);
+});
+
+// socket event listeners
+socket.on("notification_available", msg => {
+	if (msg.merchantAccount == "{{ merchant_account }}") {
+		receiveNotification(msg.notificationData);
+	}
+});
 
 // fix stray apostrophes in JSON data
 // and return formatted JSON object
 function sanitizeJSON(rawText) {
 	formattedText = rawText.replace(/"/g, "").replace(/'/g, '"');
 	return JSON.parse(formattedText);
-}
+};
 
 // add a notification to the DOM and activate code highlighting
 // if first = true adds to top
@@ -56,24 +80,25 @@ function addToDom(notification, first) {
 
 	// activate highlighting
 	hljs.highlightBlock(notificationElement);
-}
+};
 
-// callback from server-send event
-eventSource.onmessage = function(e) {
+// processes notifications received from server
+function receiveNotification(notificationData) {
 
 	// get data from event and json encode
-	notification = sanitizeJSON(e.data);
+	notification = sanitizeJSON(notificationData);
 
 	// if the event sent by the server is newer, add it to the page
-	if (Date.parse(notification.eventDate) > lastTimestamp) {
+	if (notification.pspReference != lastEventId) {
 
 		// add to DOM
 		addToDom(notification, true);
 
 		// update current timestamp
-		lastTimestamp = Date.parse(notification.eventDate);
+		lastEventId = notification.pspRefernce;
 	}
-}
+
+};
 
 // query server for more notifications
 document.querySelector("#loadMoreBtn").addEventListener("click", () => {
@@ -81,7 +106,7 @@ document.querySelector("#loadMoreBtn").addEventListener("click", () => {
 	// calculate range to ask for
 	firstNotification = currentNotificationId + 1;
 	lastNotification = currentNotificationId + 1 + notificationsPerRequest;
-	url = "/notification_server/notifications/{{ merchant_account }}/" + firstNotification.toString() + "/" + lastNotification.toString();
+	url = "{{ server_root }}/notifications/{{ merchant_account }}/" + firstNotification.toString() + "/" + lastNotification.toString();
 	currentNotificationId += notificationsPerRequest;
 
 	// add returned notifications to DOM
