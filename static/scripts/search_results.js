@@ -12,7 +12,7 @@ function initialize(pspReference, serverRoot) {
 		url: "https://roodvibes.com/" + globals.serverRoot + "/notifications/search/" + globals.pspReference,
 		success: data => {
 			// handle returned notifications
-			let results = sanitizeJSON(data);
+			let results = sanitizeJSON(data).reverse();
 
 			for (let notification of results) {
 				addToDom(notification);

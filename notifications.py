@@ -6,7 +6,7 @@ from urllib.request import Request, urlopen
 import sqlalchemy
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import select
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 
 # Flask
 from flask import Flask, Response, request, send_from_directory
@@ -149,7 +149,7 @@ def get_all_by_psp_reference(psp_reference):
 
     # query DB
     results = session.query(Notification.id, Notification.rawData).\
-        filter_by(pspReference=psp_reference).\
+        filter(or_(Notification.pspReference == psp_reference, Notification.originalReference == psp_reference)).\
         order_by(desc(Notification.id))
     
     # put results into array
