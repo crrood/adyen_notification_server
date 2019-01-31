@@ -142,7 +142,7 @@ def get_range_from_db(merchant_account, first_notification, last_notification):
 
     return response
 
-# get all notifications which match a psp reference
+# get all notifications which match a PSP reference
 def get_all_by_psp_reference(psp_reference):
     session = Session()
     response = []
@@ -196,6 +196,13 @@ def render_feed(merchant_account):
     template = env.get_template("notification_feed.html")
     return template.render(merchant_account=merchant_account, server_root=SERVER_ROOT)
 
+# show HTML page for search by PSP reference
+@app.route(f"{SERVER_ROOT}/notifications/view/search/<psp_reference>", methods=["GET"])
+def render_search_results(psp_reference):
+    # render jinja template with search results
+    template = env.get_template("search_results.html")
+    return template.render(psp_reference=psp_reference, server_root=SERVER_ROOT)
+
 # respond to GET requests to confirm that the server is up
 @app.route(f"{SERVER_ROOT}/", methods=["GET"])
 def return_all_notifications():
@@ -247,6 +254,11 @@ def incoming_notification():
 
     # send accepted response
     return app.response_class(["[accepted]"], 200)
+
+# serve static files
+@app.route(f"{SERVER_ROOT}/static/<path:path>", methods=["GET"])
+def serve_static_files(path):
+    return send_from_directory("static", path)
 
 @socketio.on("request_latest")
 def return_latest_via_socket(data):

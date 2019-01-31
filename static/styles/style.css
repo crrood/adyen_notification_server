@@ -1,0 +1,35 @@
+body {
+	background: #2b2b2b;
+}
+
+h1 {
+	color: #FFF;
+	font-family: sans-serif;
+	user-select: none;
+}
+
+code.first {
+	background: #383838;
+}
+
+code {
+	overflow-x: hidden !important;
+}
+
+button {
+	background: #484848;
+	color: #FFF;
+	border: 0px;
+	border-radius: 6px;
+	padding: 15px 45px 15px 45px;
+	font-size: 24px;
+	font-weight: bold;
+	outline: none;
+	cursor: pointer;
+	user-select: none;
+}
+
+::selection {
+	color: white;
+	background: #aaa;
+}
