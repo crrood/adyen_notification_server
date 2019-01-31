@@ -121,7 +121,7 @@ def save_to_db(json_data):
     return notification.__repr__()
 
 # get rawData for range of notifications for given merchantAccount from DB
-# the most recent notification isn't included, as it's stored in the file system
+# note the most recent notification isn't included, as it's stored in the file system for faster access
 # returns an array
 def get_range_from_db(merchant_account, first_notification, last_notification):
     session = Session()
@@ -135,6 +135,25 @@ def get_range_from_db(merchant_account, first_notification, last_notification):
     # put results into array
     last_notification = min(results.count() - 1, last_notification)
     for id, raw_data in results[first_notification : last_notification]:
+
+        # get rid of apostrophes within fields
+        raw_data = sanitize_response(raw_data)
+        response.append(raw_data)
+
+    return response
+
+# get all notifications which match a psp reference
+def get_all_by_psp_reference(psp_reference):
+    session = Session()
+    response = []
+
+    # query DB
+    results = session.query(Notification.id, Notification.rawData).\
+        filter_by(pspReference=psp_reference).\
+        order_by(desc(Notification.id))
+    
+    # put results into array
+    for id, raw_data in results:
 
         # get rid of apostrophes within fields
         raw_data = sanitize_response(raw_data)
@@ -206,6 +225,12 @@ def return_latest_via_http(merchant_account):
 @app.route(f"{SERVER_ROOT}/notifications/<string:merchant_account>/<int:first_notification_id>/<int:last_notification_id>", methods=["GET"])
 def return_range_for_merchant(merchant_account, first_notification_id, last_notification_id):
     result = get_range_from_db(merchant_account, first_notification_id, last_notification_id)
+    return Response("{}".format(result))
+
+# return all notifications which match a given PSP reference
+@app.route(f"{SERVER_ROOT}/notifications/search/<string:psp_reference>", methods=["GET"])
+def return_by_psp_reference(psp_reference):
+    result = get_all_by_psp_reference(psp_reference)
     return Response("{}".format(result))
 
 # handle incoming notifications
