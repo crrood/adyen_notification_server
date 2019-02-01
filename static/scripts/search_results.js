@@ -32,21 +32,38 @@ function sanitizeJSON(rawText) {
 // if first = true adds to top
 function addToDom(notification) {
 
-	// create element to be added
+	// create elements to be added
+	var wrapper = createCollapsibleWrapper(notification);
 	var notificationContainer = document.createElement("pre");
 	var notificationElement = document.createElement("code");
+
+	// attach to each other
 	notificationContainer.appendChild(notificationElement);
+	wrapper.appendChild(notificationContainer);
 
 	// set up new element
 	notificationElement.classList.add("json");
 	notificationElement.innerHTML = JSON.stringify(notification, null, 4);
+	notificationContainer.classList.add("hidden");
 
 	// add to DOM
 	eventList = document.getElementById("list");
-	eventList.appendChild(notificationContainer);
+	eventList.appendChild(wrapper);
 
 	// activate highlighting
 	hljs.highlightBlock(notificationElement);
+}
+
+// create a collapsible div with a summary to hold notifications
+function createCollapsibleWrapper(notification) {
+	var wrapper = document.createElement("div");
+	wrapper.classList.add("collapsible-div");
+	wrapper.addEventListener("click", event => event.srcElement.children[0].classList.toggle("hidden"));
+
+	var formattedDate = notification.eventDate.replace(/T/g, " @ ").substring(0, notification.eventDate.length - 7);
+	wrapper.innerHTML = notification.eventCode + " | success: " + notification.success + " | " + formattedDate;
+
+	return wrapper;
 }
 
 // processes notifications received from server

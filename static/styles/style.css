@@ -8,12 +8,27 @@ h1 {
 	user-select: none;
 }
 
+.collapsible-div {
+	color: #BABABA;
+	font-family: sans-serif;
+	user-select: none;
+	font-size: 20px;
+
+	padding: 5px;
+	margin: 6px;
+	border: solid #BABABA;
+	border-style: outset;
+	border-radius: 5px;
+}
+
 code.first {
 	background: #383838;
 }
 
 code {
 	overflow-x: hidden !important;
+	font-size: 14px;
+	user-select: text;
 }
 
 button {
@@ -27,6 +42,10 @@ button {
 	outline: none;
 	cursor: pointer;
 	user-select: none;
+}
+
+.hidden {
+	display: none;
 }
 
 ::selection {
