@@ -58,7 +58,12 @@ function addToDom(notification) {
 function createCollapsibleWrapper(notification) {
 	var wrapper = document.createElement("div");
 	wrapper.classList.add("collapsible-div");
-	wrapper.addEventListener("click", event => event.srcElement.children[0].classList.toggle("hidden"));
+	wrapper.addEventListener("click", event => {
+		// sanity checking to prevent activation on child elements
+		if (event.target.classList.contains("collapsible-div")) {
+			event.srcElement.children[0].classList.toggle("hidden");
+		}
+	});
 
 	var formattedDate = notification.eventDate.replace(/T/g, " @ ").substring(0, notification.eventDate.length - 7);
 	wrapper.innerHTML = notification.eventCode + " | success: " + notification.success + " | " + formattedDate;
