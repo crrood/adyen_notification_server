@@ -34,7 +34,7 @@ config = parser["config"]
 # due to legacy the production environment is blank
 ENV = config["env"]
 if ENV == "PROD":
-    SERVER_ROOT = "/notification_server/"
+    SERVER_ROOT = "/notification_server"
 else:
     SERVER_ROOT = "/notification_server_{}".format(config["env"])
 
@@ -168,10 +168,6 @@ def get_all_by_psp_reference(psp_reference):
 
     return response
 
-# get all notifications from DB
-def get_all_notifications():
-    return "a fuckload of notifications"
-
 # serve static files
 @app.route(f'{SERVER_ROOT}/static_files/<path:path>')
 def serve_files(path):
@@ -194,7 +190,7 @@ def render_search_results(psp_reference):
 
 # respond to GET requests to confirm that the server is up
 @app.route(f"{SERVER_ROOT}/", methods=["GET"])
-def return_all_notifications():
+def ping():
     return app.response_class(["Hi there!"], 200)
 
 # load json from a file
