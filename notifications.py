@@ -30,8 +30,6 @@ parser = configparser.ConfigParser()
 parser.read("config.ini")
 config = parser["config"]
 
-return loaded_config
-
 # set environment
 # due to legacy the production environment is blank
 ENV = config["env"]
@@ -39,6 +37,7 @@ if ENV == "PROD":
     ENV = ""
 
 SERVER_ROOT = "/notification_server{}".format(ENV)
+print(SERVER_ROOT)
 
 # initialize flask app
 app = Flask(__name__)
@@ -63,7 +62,7 @@ class Notification(db.Model):
     __tablename__ = "notifications"
 
     id = db.Column(db.Integer, primary_key=True)
-    rawData = db.Column(db.String(5000))
+    rawData = db.Column(db.String(10000))
     merchantAccountCode = db.Column(db.String(75))
     pspReference = db.Column(db.String(100))
     merchantReference = db.Column(db.String(100))
@@ -87,6 +86,9 @@ def sanitize_response(raw_data):
 
 # save notifications to DB
 def save_to_db(json_data):
+    # create a new DB session
+    session = Session()
+
     # create new notification object to insert into DB
     notification = Notification(
         rawData=str(json_data),

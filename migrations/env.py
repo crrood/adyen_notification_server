@@ -13,13 +13,20 @@ config = context.config
 fileConfig(config.config_file_name)
 logger = logging.getLogger('alembic.env')
 
+# SQLAlchemy database URL
+# username / password are in credentials.txt on line 1 and 2
+with open("credentials.txt", "r") as credentials_file:
+    username = credentials_file.readline().strip()
+    password = credentials_file.readline().strip()
+db_url = "postgresql+psycopg2://{}:{}@localhost:5432/postgres".format(username, password)
+
 # add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 from flask import current_app
 config.set_main_option('sqlalchemy.url',
-                       current_app.config.get('SQLALCHEMY_DATABASE_URI'))
+                       db_url)
 target_metadata = current_app.extensions['migrate'].db.metadata
 
 # other values from the config, defined by the needs of env.py,
@@ -40,7 +47,7 @@ def run_migrations_offline():
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = db_url
     context.configure(url=url)
 
     with context.begin_transaction():

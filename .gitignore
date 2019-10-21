@@ -4,4 +4,3 @@ credentials.txt
 *.log
 *.csv
 alembic.ini
-env.txt
