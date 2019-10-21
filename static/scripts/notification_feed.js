@@ -71,9 +71,11 @@ function initialize(merchant_account, server_root) {
 }
 
 // fix stray apostrophes in JSON data
+// convert python booleans to javascript
 // and return formatted JSON object
 function sanitizeJSON(rawText) {
-	formattedText = rawText.replace(/"/g, "").replace(/'/g, '"');
+	formattedText = rawText.replace(/False/g, "false").replace(/True/g, "true");
+	formattedText = formattedText.replace(/"/g, "").replace(/'/g, '"');
 	return JSON.parse(formattedText);
 };
 
