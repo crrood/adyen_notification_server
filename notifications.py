@@ -36,7 +36,7 @@ ENV = config["env"]
 if ENV == "PROD":
     SERVER_ROOT = "/notification_server/"
 else:
-    SERVER_ROOT = "notification_server_{}".format(config["env"])
+    SERVER_ROOT = "/notification_server_{}".format(config["env"])
 
 # initialize flask app
 app = Flask(__name__)
