@@ -34,10 +34,9 @@ config = parser["config"]
 # due to legacy the production environment is blank
 ENV = config["env"]
 if ENV == "PROD":
-    ENV = ""
-
-SERVER_ROOT = "/notification_server{}".format(ENV)
-print(SERVER_ROOT)
+    SERVER_ROOT = "/notification_server/"
+else:
+    SERVER_ROOT = "notification_server_{}".format(config["env"])
 
 # initialize flask app
 app = Flask(__name__)

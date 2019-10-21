@@ -4,3 +4,4 @@ credentials.txt
 *.log
 *.csv
 alembic.ini
+config.ini
