@@ -86,38 +86,28 @@ def sanitize_response(raw_data):
 
 # save notifications to DB
 def save_to_db(json_data):
-    # pull list of notifications from JSON
-    items = json_data["notificationItems"]
+    # create new notification object to insert into DB
+    notification = Notification(
+        rawData=str(item),
+        timestamp=time.time()
+    )
 
-    # create a new DB session
-    session = Session()
+    # iterate through object and populate row data
+    for column in Notification.__table__.columns:
+        if column.name in item.keys():
+            formatted_value = item[column.name]
+            if formatted_value.lower() == "false":
+                formatted_value = False
+            elif formatted_value.lower() == "true":
+                formatted_value = True
+            setattr(notification, column.name, formatted_value)
 
-    # parse notifications for entry into DB
-    for item in items:
-        item = item["NotificationRequestItem"]
-
-        # create new notification object to insert into DB
-        notification = Notification(
-            rawData=str(item),
-            timestamp=time.time()
-        )
-
-        # iterate through object and populate row data
-        for column in Notification.__table__.columns:
-            if column.name in item.keys():
-                formatted_value = item[column.name]
-                if formatted_value.lower() == "false":
-                    formatted_value = False
-                elif formatted_value.lower() == "true":
-                    formatted_value = True
-                setattr(notification, column.name, formatted_value)
-
-        # insert notification into list to be added to DB
-        session.add(notification)
+    # insert notification into list to be added to DB
+    session.add(notification)
 
     # commit to DB
     session.commit()
-    
+
     return notification.__repr__()
 
 # get rawData for range of notifications for given merchantAccount from DB
@@ -167,21 +157,13 @@ def get_all_notifications():
 
 # save to a file to be read by the feed page
 def save_to_file(json_data):
+    # save notification to file for merchant account
+    merchant_account = item["merchantAccountCode"]
+    with open("notification_files/{}".format(merchant_account), "w") as file:
+        file.write(str(item))
 
-     # pull list of notifications from JSON
-    items = json_data["notificationItems"]
-
-    # parse notifications
-    for item in items:
-        item = item["NotificationRequestItem"]
-
-        # save notification to file for merchant account
-        merchant_account = item["merchantAccountCode"]
-        with open("notification_files/{}".format(merchant_account), "w") as file:
-            file.write(str(item))
-
-        # notify listeners
-        socketio.emit("notification_available", { "merchantAccount": merchant_account, "notificationData": str(item) }, broadcast=True)
+    # notify listeners
+    socketio.emit("notification_available", { "merchantAccount": merchant_account, "notificationData": str(item) }, broadcast=True)
 
 # serve static files
 @app.route(f'{SERVER_ROOT}/static_files/<path:path>')
@@ -210,8 +192,8 @@ def return_all_notifications():
 
 # load json from a file
 def get_notification_from_file(merchant_account):
-     with open("notification_files/{}".format(merchant_account), "r") as file:
-         return sanitize_response(file.read())
+    with open("notification_files/{}".format(merchant_account), "r") as file:
+        return sanitize_response(file.read())
 
 # respond with most recent notification for a given merchant account
 # reads from a file rather than the DB
@@ -246,11 +228,28 @@ def incoming_notification():
     # get JSON object from request data
     json_data = request.get_json(force=True)
 
-    # save to DB
-    save_to_db(json_data)
+    # parse notification JSON
+    # PSP notifications come in an array called "notificationItems"
+    # but Marketpay notifications do not
+    if "notificationItems" in json_data.keys():
+        # iterate through list of notifications
+        items = json_data["notificationItems"]
 
-    # save to file to be read by feed
-    save_to_file(json_data)
+        for item in items:
+            item = item["NotificationRequestItem"]
+
+            # save to DB
+            save_to_db(json_data)
+
+            # save to file to be read by feed
+            save_to_file(json_data)
+
+    else:
+        # save to DB
+        save_to_db(json_data)
+
+        # save to file to be read by feed
+        save_to_file(json_data)
 
     # send accepted response
     return app.response_class(["[accepted]"], 200)
