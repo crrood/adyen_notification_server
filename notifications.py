@@ -1,5 +1,5 @@
 # utilities
-import time, re
+import time, re, configparser
 from urllib.request import Request, urlopen
 
 # DB connection
@@ -7,6 +7,10 @@ import sqlalchemy
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import select
 from sqlalchemy import desc, or_
+
+# Migrations
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 
 # Flask
 from flask import Flask, Response, request, send_from_directory
@@ -22,16 +26,16 @@ env = Environment(
     loader=PackageLoader("notifications", "templates")
 )
 
-# super janky "deployment" control
-# if env.txt exists and has "DEV" as its only contents, uses dev environment
-# otherwise defaults to production
-try:
-    with open("env.txt") as env_file:
-        if env_file.read().strip() == "DEV":
-            ENV = "_dev"
-        else:
-            ENV = ""
-except FileNotFoundError:
+parser = configparser.ConfigParser()
+parser.read("config.ini")
+config = parser["config"]
+
+return loaded_config
+
+# set environment
+# due to legacy the production environment is blank
+ENV = config["env"]
+if ENV == "PROD":
     ENV = ""
 
 SERVER_ROOT = "/notification_server{}".format(ENV)
@@ -50,9 +54,6 @@ db_url = "postgresql+psycopg2://{}:{}@localhost:5432/postgres".format(username, 
 engine = sqlalchemy.create_engine(db_url)
 Session = sessionmaker(bind=engine)
 
-# Migrations
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
@@ -88,14 +89,14 @@ def sanitize_response(raw_data):
 def save_to_db(json_data):
     # create new notification object to insert into DB
     notification = Notification(
-        rawData=str(item),
+        rawData=str(json_data),
         timestamp=time.time()
     )
 
     # iterate through object and populate row data
     for column in Notification.__table__.columns:
-        if column.name in item.keys():
-            formatted_value = item[column.name]
+        if column.name in json_data.keys():
+            formatted_value = json_data[column.name]
             if formatted_value.lower() == "false":
                 formatted_value = False
             elif formatted_value.lower() == "true":
@@ -109,6 +110,21 @@ def save_to_db(json_data):
     session.commit()
 
     return notification.__repr__()
+
+# save to a file to be read by the feed page
+def save_to_file(json_data):
+    # save notification to file for merchant account
+    if "merchantAccountCode" in json_data.keys():
+        merchant_account = json_data["merchantAccountCode"]
+    else:
+        merchant_account = config["default_merchant_account"]
+
+    # save to file
+    with open("notification_files/{}".format(merchant_account), "w") as file:
+        file.write(str(json_data))
+
+    # notify listeners
+    socketio.emit("notification_available", {"merchantAccount": merchant_account, "notificationData": str(json_data)}, broadcast=True)
 
 # get rawData for range of notifications for given merchantAccount from DB
 # note the most recent notification isn't included, as it's stored in the file system for faster access
@@ -141,7 +157,7 @@ def get_all_by_psp_reference(psp_reference):
     results = session.query(Notification.id, Notification.rawData).\
         filter(or_(Notification.pspReference == psp_reference, Notification.originalReference == psp_reference)).\
         order_by(desc(Notification.id))
-    
+
     # put results into array
     for id, raw_data in results:
 
@@ -154,16 +170,6 @@ def get_all_by_psp_reference(psp_reference):
 # get all notifications from DB
 def get_all_notifications():
     return "a fuckload of notifications"
-
-# save to a file to be read by the feed page
-def save_to_file(json_data):
-    # save notification to file for merchant account
-    merchant_account = item["merchantAccountCode"]
-    with open("notification_files/{}".format(merchant_account), "w") as file:
-        file.write(str(item))
-
-    # notify listeners
-    socketio.emit("notification_available", { "merchantAccount": merchant_account, "notificationData": str(item) }, broadcast=True)
 
 # serve static files
 @app.route(f'{SERVER_ROOT}/static_files/<path:path>')
@@ -261,8 +267,8 @@ def serve_static_files(path):
 
 @socketio.on("request_latest")
 def return_latest_via_socket(data):
-    emit("notification_avilable", { 
-        "merchantAccount": data["merchantAccount"], 
+    emit("notification_avilable", {
+        "merchantAccount": data["merchantAccount"],
         "notificationData": get_notification_from_file(data["merchantAccount"])
     })
     return get_notification_from_file(data["merchantAccount"])
