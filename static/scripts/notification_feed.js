@@ -75,8 +75,13 @@ function initialize(merchant_account, server_root) {
 // and return formatted JSON object
 function sanitizeJSON(rawText) {
 	formattedText = rawText.replace(/False/g, "false").replace(/True/g, "true");
-	formattedText = formattedText.replace(/"/g, "").replace(/'/g, '"');
-	return JSON.parse(formattedText);
+	try {
+		return JSON.parse(formattedText);
+	}
+	catch(e) {
+		console.log(rawText);
+		console.error(e);
+	}
 };
 
 // add a notification to the DOM and activate code highlighting

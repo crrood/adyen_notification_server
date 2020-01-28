@@ -1,5 +1,5 @@
 # utilities
-import time, re, configparser
+import time, re, configparser, json
 from urllib.request import Request, urlopen
 
 # DB connection
@@ -31,7 +31,6 @@ parser.read("config.ini")
 config = parser["config"]
 
 # set environment
-# due to legacy the production environment is blank
 ENV = config["env"]
 if ENV == "PROD":
     SERVER_ROOT = "/notification_server"
@@ -77,12 +76,6 @@ class Notification(db.Model):
         attributes = [field for field in dir(self) if field[0] != "_"]
         return str(["{}: {}".format(field, getattr(self, field)) for field in attributes])
 
-# remove apostrophes from raw data
-def sanitize_response(raw_data):
-    raw_data = re.sub(r"([a-zA-Z])'([a-zA-Z])", "\g<1>\g<2>", raw_data)
-    raw_data = raw_data.replace('"', "'")
-    return raw_data
-
 # save notifications to DB
 def save_to_db(json_data):
     # create a new DB session
@@ -95,14 +88,22 @@ def save_to_db(json_data):
     )
 
     # iterate through object and populate row data
+    # only stores values which are defined in the Notification schema
     for column in Notification.__table__.columns:
         if column.name in json_data.keys():
             formatted_value = json_data[column.name]
+            
+            # reformat strings to booleans
             if formatted_value.lower() == "false":
                 formatted_value = False
             elif formatted_value.lower() == "true":
                 formatted_value = True
+            
             setattr(notification, column.name, formatted_value)
+
+    # set default merchant account if one isn't present (for AfP notifications)
+    if "merchantAccountCode" not in json_data.keys():
+        setattr(notification, "merchantAccountCode", config["default_merchant_account"])
 
     # insert notification into list to be added to DB
     session.add(notification)
@@ -122,10 +123,13 @@ def save_to_file(json_data):
 
     # save to file
     with open("notification_files/{}".format(merchant_account), "w") as file:
-        file.write(str(json_data))
+        file.write(json.dumps(json_data))
 
     # notify listeners
-    socketio.emit("notification_available", {"merchantAccount": merchant_account, "notificationData": str(json_data)}, broadcast=True)
+    socketio.emit(
+            "notification_available", 
+            {"merchantAccount": merchant_account, "notificationData": json.dumps(json_data)}, 
+            broadcast=True)
 
 # get rawData for range of notifications for given merchantAccount from DB
 # note the most recent notification isn't included, as it's stored in the file system for faster access
@@ -142,9 +146,6 @@ def get_range_from_db(merchant_account, first_notification, last_notification):
     # put results into array
     last_notification = min(results.count() - 1, last_notification)
     for id, raw_data in results[first_notification : last_notification]:
-
-        # get rid of apostrophes within fields
-        raw_data = sanitize_response(raw_data)
         response.append(raw_data)
 
     return response
@@ -161,9 +162,6 @@ def get_all_by_psp_reference(psp_reference):
 
     # put results into array
     for id, raw_data in results:
-
-        # get rid of apostrophes within fields
-        raw_data = sanitize_response(raw_data)
         response.append(raw_data)
 
     return response
@@ -196,7 +194,7 @@ def ping():
 # load json from a file
 def get_notification_from_file(merchant_account):
     with open("notification_files/{}".format(merchant_account), "r") as file:
-        return sanitize_response(file.read())
+        return file.read()
 
 # respond with most recent notification for a given merchant account
 # reads from a file rather than the DB
@@ -242,10 +240,10 @@ def incoming_notification():
             item = item["NotificationRequestItem"]
 
             # save to DB
-            save_to_db(json_data)
+            save_to_db(item)
 
             # save to file to be read by feed
-            save_to_file(json_data)
+            save_to_file(item)
 
     else:
         # save to DB
