@@ -83,7 +83,7 @@ def save_to_db(json_data):
 
     # create new notification object to insert into DB
     notification = Notification(
-        rawData=str(json_data),
+        rawData=json.dumps(json_data),
         timestamp=time.time()
     )
 

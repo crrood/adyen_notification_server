@@ -26,7 +26,7 @@ function initialize(merchant_account, server_root) {
 			if (this.readyState == 4) {
 
 				// parse response
-				notifications = sanitizeJSON(this.responseText);
+				let notifications = sanitizeJSON(this.responseText);
 
 				// create DOM element for each JSON object in response
 				for (var i = 0; i < notifications.length; i++) {
@@ -75,6 +75,7 @@ function initialize(merchant_account, server_root) {
 // and return formatted JSON object
 function sanitizeJSON(rawText) {
 	formattedText = rawText.replace(/False/g, "false").replace(/True/g, "true");
+	formattedText = formattedText.replace(/'{/g, "{").replace(/}'/g, "}");
 	try {
 		return JSON.parse(formattedText);
 	}
