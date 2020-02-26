@@ -123,13 +123,14 @@ function receiveNotification(notificationData) {
 	notification = sanitizeJSON(notificationData);
 
 	// if the event sent by the server is newer, add it to the page
-	if (notification.pspReference != lastEventId) {
+	pspReference = notification.pspReference || notification.additionalData.pspReference;
+	if (pspReference != lastEventId) {
 
 		// add to DOM
 		addToDom(notification, true);
 
 		// update current timestamp
-		lastEventId = notification.pspRefernce;
+		lastEventId = pspReference;
 	}
 
 };

@@ -271,3 +271,18 @@ def return_latest_via_socket(data):
 @socketio.on("ping")
 def pong(data):
     return data
+
+@app.route(f"{SERVER_ROOT}/merchant_acquirer", methods=["POST"])
+def merchant_acquirer():
+    # handle requests from the MerchantAcquirer
+    json_data = request.get_json(force=True)
+
+    save_to_file(json_data)
+
+    response_dict = {
+            "pspReference": json_data["additionalData"]["pspReference"],
+            "resultCode": "Authorised",
+            "authCode": "53220"
+    }
+    
+    return app.response_class([json.dumps(response_dict)], 200)
