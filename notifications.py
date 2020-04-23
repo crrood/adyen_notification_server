@@ -26,6 +26,10 @@ env = Environment(
     loader=PackageLoader("notifications", "templates")
 )
 
+  ###############
+ ## APP SETUP ##
+###############
+
 parser = configparser.ConfigParser()
 parser.read("config.ini")
 config = parser["config"]
@@ -41,6 +45,10 @@ else:
 app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, path=f"{SERVER_ROOT}/socket.io")
+
+  ##############
+ ## DATABASE ##
+##############
 
 # initialize DB connection
 # username / password are in credentials.txt on line 1 and 2
@@ -92,18 +100,19 @@ def save_to_db(json_data, merchant_account=None):
     for column in Notification.__table__.columns:
         if column.name in json_data.keys():
             formatted_value = json_data[column.name]
-            
+
             # reformat strings to booleans
             if formatted_value.lower() == "false":
                 formatted_value = False
             elif formatted_value.lower() == "true":
                 formatted_value = True
-            
+
             setattr(notification, column.name, formatted_value)
 
-    # set default merchant account if one isn't present (for AfP notifications)
-    if "merchantAccountCode" not in json_data.keys():
-        setattr(notification, "merchantAccountCode", config["default_merchant_account"])
+    # set default merchant account if one isn't present
+    if not merchant_account:
+        merchant_account = get_merchant_account(json_data)
+    setattr(notification, "merchantAccountCode", merchant_account)
 
     # insert notification into list to be added to DB
     session.add(notification)
@@ -114,12 +123,10 @@ def save_to_db(json_data, merchant_account=None):
     return notification.__repr__()
 
 # save to a file to be read by the feed page
-def save_to_file(json_data):
-    # save notification to file for merchant account
-    if "merchantAccountCode" in json_data.keys():
-        merchant_account = json_data["merchantAccountCode"]
-    else:
-        merchant_account = config["default_merchant_account"]
+def save_to_file(json_data, merchant_account=None):
+    # will be queried by merchant account later
+    if not merchant_account:
+        merchant_account = get_merchant_account(json_data)
 
     # save to file
     with open("notification_files/{}".format(merchant_account), "w") as file:
@@ -127,25 +134,32 @@ def save_to_file(json_data):
 
     # notify listeners
     socketio.emit(
-            "notification_available", 
-            {"merchantAccount": merchant_account, "notificationData": json.dumps(json_data)}, 
-            broadcast=True)
+        "notification_available",
+        {"merchantAccount": merchant_account, "notificationData": json.dumps(json_data)},
+        broadcast=True)
+
+# get merchant account from request or fall back to default
+def get_merchant_account(json_data):
+    if "merchantAccountCode" in json_data.keys():
+        return json_data["merchantAccountCode"]
+    else:
+        return config["default_merchant_account"]
 
 # get rawData for range of notifications for given merchantAccount from DB
-# note the most recent notification isn't included, as it's stored in the file system for faster access
+# the most recent notification isn't included, as it's stored in the file system for faster access
 # returns an array
 def get_range_from_db(merchant_account, first_notification, last_notification):
     session = Session()
     response = []
 
     # query DB
-    results = session.query(Notification.id, Notification.rawData).\
+    results = session.query(Notification.rawData).\
         filter_by(merchantAccountCode=merchant_account).\
         order_by(desc(Notification.id))
 
     # put results into array
     last_notification = min(results.count() - 1, last_notification)
-    for id, raw_data in results[first_notification : last_notification]:
+    for raw_data in results[first_notification : last_notification]:
         response.append(raw_data)
 
     return response
@@ -166,6 +180,9 @@ def get_all_by_psp_reference(psp_reference):
 
     return response
 
+  ############
+ ## ROUTES ##
+############
 # serve static files
 @app.route(f'{SERVER_ROOT}/static_files/<path:path>')
 def serve_files(path):
@@ -201,13 +218,12 @@ def get_notification_from_file(merchant_account):
 @app.route(f"{SERVER_ROOT}/notifications/<merchant_account>", methods=["GET"])
 def return_latest_via_http(merchant_account):
     return Response(get_notification_from_file(merchant_account),
-        mimetype="text/json",
-        headers=Headers([
-            ("Access-Control-Allow-Origin", "roodberry.duckdns.org,www.roodvibes.com"),
-            ("Cache-Control", "no-cache"),
-            ("Connection", "keep-alive")
-        ])
-    )
+                    mimetype="text/json",
+                    headers=Headers([
+                        ("Access-Control-Allow-Origin", "roodberry.duckdns.org,www.roodvibes.com"),
+                        ("Cache-Control", "no-cache"),
+                        ("Connection", "keep-alive")])
+                    )
 
 # respond with notifications from n to m for a given merchant
 # with n=0 being the latest entry
@@ -262,22 +278,22 @@ def handle_issuing_notifications():
     json_data = request.get_json(force=True)
 
     # save to DB
-    save_to_db(json_data)
+    save_to_db(json_data, "balancePlatform")
 
     # save to file to be read by feed
-    save_to_file(json_data)
+    save_to_file(json_data, "balancePlatform")
 
     # authorisation conditions are (in order):
     # 1. refuse if reference includes "Refused"
     # 2. mirror authorisationDecision.status
     # 3. authorise by default
-    if "Refused" in json_data["reference"]:
+    if "reference" in json_data.keys() and "Refused" in json_data["reference"]:
         status = "Refused"
     elif "authorisationDecision" in json_data.keys():
         status = json_data["authorisationDecision"]["status"]
     else:
         status = "Authorised"
-    
+
     response_json = {
         "result": {
             "status": status
@@ -289,6 +305,21 @@ def handle_issuing_notifications():
     }
 
     return app.response_class([response_json], 200)
+
+@app.route(f"{SERVER_ROOT}/merchant_acquirer", methods=["POST"])
+def merchant_acquirer():
+    # handle requests from the MerchantAcquirer
+    json_data = request.get_json(force=True)
+
+    save_to_file(json_data)
+
+    response_dict = {
+        "pspReference": json_data["additionalData"]["pspReference"],
+        "resultCode": "Authorised",
+        "authCode": "53220"
+    }
+
+    return app.response_class([json.dumps(response_dict)], 200)
 
 # serve static files
 @app.route(f"{SERVER_ROOT}/static/<path:path>", methods=["GET"])
@@ -306,18 +337,3 @@ def return_latest_via_socket(data):
 @socketio.on("ping")
 def pong(data):
     return data
-
-@app.route(f"{SERVER_ROOT}/merchant_acquirer", methods=["POST"])
-def merchant_acquirer():
-    # handle requests from the MerchantAcquirer
-    json_data = request.get_json(force=True)
-
-    save_to_file(json_data)
-
-    response_dict = {
-            "pspReference": json_data["additionalData"]["pspReference"],
-            "resultCode": "Authorised",
-            "authCode": "53220"
-    }
-    
-    return app.response_class([json.dumps(response_dict)], 200)
