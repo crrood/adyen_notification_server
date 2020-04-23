@@ -122,15 +122,6 @@ function receiveNotification(notificationData) {
 	// get data from event and json encode
 	notification = sanitizeJSON(notificationData);
 
-	// if the event sent by the server is newer, add it to the page
-	pspReference = notification.pspReference || notification.additionalData.pspReference;
-	if (pspReference != lastEventId) {
-
-		// add to DOM
-		addToDom(notification, true);
-
-		// update current timestamp
-		lastEventId = pspReference;
-	}
-
+	// add it to the page
+	addToDom(notification, true);
 };
