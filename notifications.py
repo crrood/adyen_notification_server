@@ -160,7 +160,7 @@ def get_range_from_db(merchant_account, first_notification, last_notification):
     # put results into array
     last_notification = min(results.count() - 1, last_notification)
     for raw_data in results[first_notification : last_notification]:
-        response.append(raw_data)
+        response.append(raw_data[0])
 
     return response
 
