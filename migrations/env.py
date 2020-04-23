@@ -15,7 +15,7 @@ logger = logging.getLogger('alembic.env')
 
 # SQLAlchemy database URL
 # username / password are in credentials.txt on line 1 and 2
-with open("credentials.txt", "r") as credentials_file:
+with open("../credentials.txt", "r") as credentials_file:
     username = credentials_file.readline().strip()
     password = credentials_file.readline().strip()
 db_url = "postgresql+psycopg2://{}:{}@localhost:5432/postgres".format(username, password)
@@ -27,7 +27,7 @@ db_url = "postgresql+psycopg2://{}:{}@localhost:5432/postgres".format(username, 
 from flask import current_app
 config.set_main_option('sqlalchemy.url',
                        db_url)
-target_metadata = current_app.extensions['migrate'].db.metadata
+#target_metadata = current_app.extensions['migrate'].db.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -78,9 +78,10 @@ def run_migrations_online():
 
     connection = engine.connect()
     context.configure(connection=connection,
-                      target_metadata=target_metadata,
-                      process_revision_directives=process_revision_directives,
-                      **current_app.extensions['migrate'].configure_args)
+                      #target_metadata=target_metadata,
+                      process_revision_directives=process_revision_directives
+                      #**current_app.extensions['migrate'].configure_args
+                      )
 
     try:
         with context.begin_transaction():
