@@ -77,7 +77,7 @@ class Notification(db.Model):
         return str(["{}: {}".format(field, getattr(self, field)) for field in attributes])
 
 # save notifications to DB
-def save_to_db(json_data):
+def save_to_db(json_data, merchant_account=None):
     # create a new DB session
     session = Session()
 
@@ -254,6 +254,41 @@ def incoming_notification():
 
     # send accepted response
     return app.response_class(["[accepted]"], 200)
+
+# handle notifications for Adyen's card issuing platform
+@app.route(f"{SERVER_ROOT}/balancePlatformNotifications/", methods=["POST"])
+def handle_issuing_notifications():
+    # get JSON object from request data
+    json_data = request.get_json(force=True)
+
+    # save to DB
+    save_to_db(json_data)
+
+    # save to file to be read by feed
+    save_to_file(json_data)
+
+    # authorisation conditions are (in order):
+    # 1. refuse if reference includes "Refused"
+    # 2. mirror authorisationDecision.status
+    # 3. authorise by default
+    if "Refused" in json_data["reference"]:
+        status = "Refused"
+    elif "authorisationDecision" in json_data.keys():
+        status = json_data["authorisationDecision"]["status"]
+    else:
+        status = "Authorised"
+    
+    response_json = {
+        "result": {
+            "status": status
+        },
+        "reference": "RelayedAuth " + json_data["reference"],
+        "metadata": {
+            "authId": json_data["id"]
+        }
+    }
+
+    return app.response_class([response_json], 200)
 
 # serve static files
 @app.route(f"{SERVER_ROOT}/static/<path:path>", methods=["GET"])
