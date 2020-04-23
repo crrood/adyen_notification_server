@@ -273,7 +273,7 @@ def incoming_notification():
 
 # handle notifications for Adyen's card issuing platform
 @app.route(f"{SERVER_ROOT}/balancePlatformNotifications/", methods=["POST"])
-def handle_issuing_notifications():
+def balance_platform_notifications():
     # get JSON object from request data
     json_data = request.get_json(force=True)
 
@@ -301,7 +301,8 @@ def handle_issuing_notifications():
         "reference": "RelayedAuth " + json_data["reference"],
         "metadata": {
             "authId": json_data["id"]
-        }
+        },
+        "serverAck": "[accepted]"
     }
 
     return app.response_class([response_json], 200)
