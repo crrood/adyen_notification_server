@@ -80,8 +80,11 @@ function sanitizeJSON(rawText) {
 		return JSON.parse(formattedText);
 	}
 	catch(e) {
-		console.log(rawText);
 		console.error(e);
+		console.log("raw input:");
+		console.log(rawText);
+		console.log("formatted input:");
+		console.log(formattedText);
 	}
 };
 
