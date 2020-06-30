@@ -282,30 +282,38 @@ def balance_platform_notifications():
 
     # save to file to be read by feed
     save_to_file(json_data, "balancePlatform")
-
-    # authorisation conditions are (in order):
-    # 1. refuse if reference includes "Refused"
-    # 2. mirror authorisationDecision.status
-    # 3. authorise by default
-    if "reference" in json_data.keys() and "Refused" in json_data["reference"]:
-        status = "Refused"
-    elif "authorisationDecision" in json_data.keys():
-        status = json_data["authorisationDecision"]["status"]
+    
+    # are we dealing with a relayed auth or informational notification?
+    if "data" in json_data.keys():
+        # informational update
+        # already been stored to db, so just acknowledge receipt
+        response = "[accepted]"
     else:
-        status = "Authorised"
+        # relayed auth
 
-    response_json = {
-        "result": {
-            "status": status
-        },
-        "reference": "RelayedAuth " + json_data["reference"],
-        "metadata": {
-            "authId": json_data["id"]
-        },
-        "serverAck": "[accepted]"
-    }
+        # authorisation conditions are (in order):
+        # 1. refuse if reference includes "Refused"
+        # 2. mirror authorisationDecision.status
+        # 3. authorise by default
+        if "reference" in json_data.keys() and "Refused" in json_data["reference"]:
+            status = "Refused"
+        elif "authorisationDecision" in json_data.keys():
+            status = json_data["authorisationDecision"]["status"]
+        else:
+            status = "Authorised"
 
-    return app.response_class([response_json], 200)
+        response = {
+            "result": {
+                "status": status
+            },
+            "reference": "RelayedAuth " + json_data["data"]["id"],
+            "metadata": {
+                "authId": json_data["id"]
+            },
+            "serverAck": "[accepted]"
+        }
+
+    return app.response_class([response], 200)
 
 @app.route(f"{SERVER_ROOT}/merchant_acquirer", methods=["POST"])
 def merchant_acquirer():
