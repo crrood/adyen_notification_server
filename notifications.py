@@ -13,7 +13,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 
 # Flask
-from flask import Flask, Response, request, send_from_directory
+from flask import Flask, Response, request, send_from_directory, make_response
 from flask_cors import CORS
 from werkzeug.datastructures import Headers
 
@@ -287,7 +287,7 @@ def balance_platform_notifications():
     if "data" in json_data.keys():
         # informational update
         # already been stored to db, so just acknowledge receipt
-        response = "[accepted]"
+        response = { "notificationResponse": "[accepted]" }
     else:
         # relayed auth
 
@@ -313,7 +313,7 @@ def balance_platform_notifications():
             "serverAck": "[accepted]"
         }
 
-    return app.response_class([response], 200)
+    return make_response(response)
 
 @app.route(f"{SERVER_ROOT}/merchant_acquirer", methods=["POST"])
 def merchant_acquirer():
