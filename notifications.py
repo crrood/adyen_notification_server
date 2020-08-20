@@ -120,7 +120,10 @@ def save_to_db(json_data, merchant_account=None):
     # commit to DB
     session.commit()
 
-    return notification.__repr__()
+    result = notification.__repr__()
+    session.close()
+
+    return result
 
 # save to a file to be read by the feed page
 def save_to_file(json_data, merchant_account=None):
@@ -162,6 +165,8 @@ def get_range_from_db(merchant_account, first_notification, last_notification):
     for raw_data in results[first_notification : last_notification]:
         response.append(raw_data[0])
 
+    session.close()
+
     return response
 
 # get all notifications which match a PSP reference
@@ -177,6 +182,8 @@ def get_all_by_psp_reference(psp_reference):
     # put results into array
     for id, raw_data in results:
         response.append(raw_data)
+
+    session.close()
 
     return response
 
@@ -272,7 +279,8 @@ def incoming_notification():
     return app.response_class(["[accepted]"], 200)
 
 # handle notifications for Adyen's card issuing platform
-@app.route(f"{SERVER_ROOT}/balancePlatformNotifications/", methods=["POST"])
+@app.route(f"{SERVER_ROOT}/balance_platform/notifications/", methods=["POST"])
+@app.route(f"{SERVER_ROOT}/balance_platform/relayed_auth/", methods=["POST"])
 def balance_platform_notifications():
     # get JSON object from request data
     json_data = request.get_json(force=True)
