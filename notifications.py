@@ -279,7 +279,7 @@ def incoming_notification():
     return app.response_class(["[accepted]"], 200)
 
 # handle notifications for Adyen's card issuing platform
-@app.route(f"{SERVER_ROOT}/balance_platform/notifications/", methods=["POST"])
+@app.route(f"{SERVER_ROOT}/balance_platform/notifications", methods=["POST"])
 def balance_platform_notifications():
     # get JSON object from request data
     json_data = request.get_json(force=True)
@@ -297,8 +297,23 @@ def balance_platform_notifications():
     return make_response(response)
 
 # relayed auth for issued cards
-@app.route(f"{SERVER_ROOT}/balance_platform/relayed_auth/", methods=["POST"])
+@app.route(f"{SERVER_ROOT}/balance_platform/relayed_auth", methods=["POST"])
 def relayed_auth():
+    # get JSON object from request data
+    json_data = request.get_json(force=True)
+
+    # the "id" field is a primary key in the db
+    # rename it to avoid collisions
+    tx_id = json_data["id"]
+    json_data["id_MODIFIED"] = tx_id
+    del json_data["id"]
+
+    # save to DB
+    save_to_db(json_data, "balancePlatform")
+
+    # save to file to be read by feed
+    save_to_file(json_data, "balancePlatform")
+    
     # authorisation conditions are (in order):
     # 1. refuse if reference includes "Refused"
     # 2. mirror authorisationDecision.status
@@ -314,9 +329,9 @@ def relayed_auth():
         "result": {
             "status": status
         },
-        "reference": "RelayedAuth " + json_data["data"]["id"],
+        "reference": "RelayedAuth " + tx_id,
         "metadata": {
-            "authId": json_data["id"]
+            "authId": tx_id
         },
         "serverAck": "[accepted]"
     }
