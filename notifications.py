@@ -280,7 +280,6 @@ def incoming_notification():
 
 # handle notifications for Adyen's card issuing platform
 @app.route(f"{SERVER_ROOT}/balance_platform/notifications/", methods=["POST"])
-@app.route(f"{SERVER_ROOT}/balance_platform/relayed_auth/", methods=["POST"])
 def balance_platform_notifications():
     # get JSON object from request data
     json_data = request.get_json(force=True)
@@ -291,36 +290,37 @@ def balance_platform_notifications():
     # save to file to be read by feed
     save_to_file(json_data, "balancePlatform")
     
-    # are we dealing with a relayed auth or informational notification?
-    if "data" in json_data.keys():
-        # informational update
-        # already been stored to db, so just acknowledge receipt
-        response = { "notificationResponse": "[accepted]" }
+    # informational update
+    # already been stored to db, so just acknowledge receipt
+    response = { "notificationResponse": "[accepted]" }
+
+    return make_response(response)
+
+# relayed auth for issued cards
+@app.route(f"{SERVER_ROOT}/balance_platform/relayed_auth/", methods=["POST"])
+def relayed_auth():
+    # authorisation conditions are (in order):
+    # 1. refuse if reference includes "Refused"
+    # 2. mirror authorisationDecision.status
+    # 3. authorise by default
+    if "reference" in json_data.keys() and "Refused" in json_data["reference"]:
+        status = "Refused"
+    elif "authorisationDecision" in json_data.keys():
+        status = json_data["authorisationDecision"]["status"]
     else:
-        # relayed auth
+        status = "Authorised"
 
-        # authorisation conditions are (in order):
-        # 1. refuse if reference includes "Refused"
-        # 2. mirror authorisationDecision.status
-        # 3. authorise by default
-        if "reference" in json_data.keys() and "Refused" in json_data["reference"]:
-            status = "Refused"
-        elif "authorisationDecision" in json_data.keys():
-            status = json_data["authorisationDecision"]["status"]
-        else:
-            status = "Authorised"
-
-        response = {
-            "result": {
-                "status": status
-            },
-            "reference": "RelayedAuth " + json_data["data"]["id"],
-            "metadata": {
-                "authId": json_data["id"]
-            },
-            "serverAck": "[accepted]"
-        }
-
+    response = {
+        "result": {
+            "status": status
+        },
+        "reference": "RelayedAuth " + json_data["data"]["id"],
+        "metadata": {
+            "authId": json_data["id"]
+        },
+        "serverAck": "[accepted]"
+    }
+    
     return make_response(response)
 
 @app.route(f"{SERVER_ROOT}/merchant_acquirer", methods=["POST"])
