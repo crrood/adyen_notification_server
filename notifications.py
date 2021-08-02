@@ -79,6 +79,10 @@ class Notification(db.Model):
     reason = db.Column(db.String(300))
     paymentMethod = db.Column(db.String(100))
     originalReference = db.Column(db.String(100))
+    eventId = db.Column(db.String(25))
+    eventType = db.Column(db.String(100))
+    status = db.Column(db.String(25))
+    amount = db.Column(db.String(25))
 
     def __repr__(self):
         attributes = [field for field in dir(self) if field[0] != "_"]
@@ -102,10 +106,11 @@ def save_to_db(json_data, merchant_account=None):
             formatted_value = json_data[column.name]
 
             # reformat strings to booleans
-            if formatted_value.lower() == "false":
-                formatted_value = False
-            elif formatted_value.lower() == "true":
-                formatted_value = True
+            if isinstance(formatted_value, str):
+                if formatted_value.lower() == "false":
+                    formatted_value = False
+                elif formatted_value.lower() == "true":
+                    formatted_value = True
 
             setattr(notification, column.name, formatted_value)
 
@@ -113,6 +118,19 @@ def save_to_db(json_data, merchant_account=None):
     if not merchant_account:
         merchant_account = get_merchant_account(json_data)
     setattr(notification, "merchantAccountCode", merchant_account)
+
+    # if "data" object is present, pull fields to be stored
+    if "data" in json_data.keys():
+        setattr(notification, "eventId", json_data["data"]["id"])
+        setattr(notification, "status", json_data["data"]["status"])
+        setattr(notification, "eventType", json_data["type"])
+        setattr(notification, "eventData", json_data["data"]["creationDate"])
+
+    # get and format amount
+    if "amount" in json_data.keys():
+        setattr(notification, "amount", json_data["amount"]["currency"] + " " + str(json_data["amount"]["value"]))
+    elif "data" in json_data.keys():
+        setattr(notification, "amount", json_data["data"]["amount"]["currency"] + " " + str(json_data["data"]["amount"]["value"]))
 
     # insert notification into list to be added to DB
     session.add(notification)
