@@ -121,10 +121,16 @@ def save_to_db(json_data, merchant_account=None):
 
     # if "data" object is present, pull fields to be stored
     if "data" in json_data.keys():
-        setattr(notification, "eventId", json_data["data"]["id"])
-        setattr(notification, "status", json_data["data"]["status"])
-        setattr(notification, "eventType", json_data["type"])
-        setattr(notification, "eventData", json_data["data"]["creationDate"])
+        table_mapping = [
+            ("eventId", "id"),
+            ("status", "status"),
+            ("eventDate", "creationDate"),
+            ("originalReference", "paymentId")
+        ]
+        
+        for mapping in table_mapping:
+            if mapping[1] in json_data["data"].keys():
+                setattr(notification, mapping[0], json_data["data"][mapping[1]])
 
     # get and format amount
     if "amount" in json_data.keys():
@@ -194,7 +200,7 @@ def get_all_by_psp_reference(psp_reference):
 
     # query DB
     results = session.query(Notification.id, Notification.rawData).\
-        filter(or_(Notification.pspReference == psp_reference, Notification.originalReference == psp_reference)).\
+        filter(or_(Notification.pspReference == psp_reference, Notification.originalReference == psp_reference, Notification.eventId == psp_reference)).\
         order_by(desc(Notification.id))
 
     # put results into array

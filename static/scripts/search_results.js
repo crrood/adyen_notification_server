@@ -24,37 +24,37 @@ function initialize(pspReference, serverRoot) {
 // fix stray apostrophes in JSON data
 // and return formatted JSON object
 function sanitizeJSON(rawText) {
-	formattedText = rawText.replace(/"/g, "").replace(/'/g, '"');
+	formattedText = rawText.replace(/'/g, '');
 	return JSON.parse(formattedText);
 }
 
 // add a notification to the DOM and activate code highlighting
 // if first = true adds to top
 function addToDom(notification) {
-
 	// create elements to be added
-	var wrapper = createCollapsibleWrapper(notification);
+	// var wrapper = createCollapsibleWrapper(notification);
 	var notificationContainer = document.createElement("pre");
 	var notificationElement = document.createElement("code");
 
 	// attach to each other
 	notificationContainer.appendChild(notificationElement);
-	wrapper.appendChild(notificationContainer);
+	// wrapper.appendChild(notificationContainer);
 
 	// set up new element
 	notificationElement.classList.add("json");
 	notificationElement.innerHTML = JSON.stringify(notification, null, 4);
-	notificationContainer.classList.add("hidden");
+	// notificationContainer.classList.add("hidden");  // commented out until the wrapper is used again
 
 	// add to DOM
 	eventList = document.getElementById("list");
-	eventList.appendChild(wrapper);
+	eventList.appendChild(notificationContainer);
 
 	// activate highlighting
 	hljs.highlightBlock(notificationElement);
 }
 
 // create a collapsible div with a summary to hold notifications
+// NOTE this isn't used now, needs a lot of design work
 function createCollapsibleWrapper(notification) {
 	var wrapper = document.createElement("div");
 	wrapper.classList.add("collapsible-div");
@@ -65,6 +65,7 @@ function createCollapsibleWrapper(notification) {
 		}
 	});
 
+	console.log(notification);
 	var formattedDate = notification.eventDate.replace(/T/g, " @ ").substring(0, notification.eventDate.length - 7);
 	wrapper.innerHTML = notification.eventCode + " | success: " + notification.success + " | " + formattedDate;
 
