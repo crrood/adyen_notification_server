@@ -135,7 +135,7 @@ def save_to_db(json_data, merchant_account=None):
     # get and format amount
     if "amount" in json_data.keys():
         setattr(notification, "amount", json_data["amount"]["currency"] + " " + str(json_data["amount"]["value"]))
-    elif "data" in json_data.keys():
+    elif "data" in json_data.keys() and "amount" in json_data["data"].keys():
         setattr(notification, "amount", json_data["data"]["amount"]["currency"] + " " + str(json_data["data"]["amount"]["value"]))
 
     # insert notification into list to be added to DB
