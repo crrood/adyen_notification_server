@@ -76,6 +76,7 @@ function initialize(merchant_account, server_root) {
 function sanitizeJSON(rawText) {
 	formattedText = rawText.replace(/False/g, "false").replace(/True/g, "true");
 	formattedText = formattedText.replace(/'{/g, "{").replace(/}'/g, "}");
+	formattedText = formattedText.replace(/\\u2019/g, "'").replace(/\\/g, "");
 	try {
 		return JSON.parse(formattedText);
 	}
